@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math"
 	"net/http"
+	"strings"
 
 	"github.com/twpayne/go-geom"
 )
@@ -39,7 +41,7 @@ func (d *Size) UnmarshalJSON(data []byte) error {
 }
 
 // FetchMap : fetch a map from url and layer with bounds in EPSG:4326 and return a png with size
-func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size) (result string, err error) {
+func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size, params map[string]string) (result string, err error) {
 	if bounds.SRID() != 4326 {
 		return "", errors.New("NO VALID SRID")
 	}
@@ -51,11 +53,18 @@ func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size) (res
 		size.Height = int(float64(size.Width) / ratio)
 	}
 	if size.Width < size.Height {
-		temp := size.Width
-		size.Width = size.Height
-		size.Height = temp
+		size.Width, size.Height = size.Height, size.Width
 	}
-	call := fmt.Sprintf("%s?service=WMS&version=1.1.0&request=GetMap&layers=%s&bbox=%f,%f,%f,%f&width=%d&height=%d&srs=EPSG:4326&format=image/png", url, layer, bounds.Bounds().Min(0), bounds.Bounds().Min(1), bounds.Bounds().Max(0), bounds.Bounds().Max(1), size.Width, size.Height)
+	paramString := ""
+	if len(params) > 0 {
+		allParams := make([]string, 0, len(params))
+		for k, v := range params {
+			allParams = append(allParams, k+"="+v)
+		}
+		paramString = "&" + strings.Join(allParams, "&")
+	}
+	call := fmt.Sprintf("%s?service=WMS&version=1.1.0&request=GetMap&layers=%s&bbox=%f,%f,%f,%f&width=%d&height=%d&srs=EPSG:4326&format=image/png%s", url, layer, bounds.Bounds().Min(0), bounds.Bounds().Min(1), bounds.Bounds().Max(0), bounds.Bounds().Max(1), size.Width, size.Height, paramString)
+	log.Printf("%+v", call)
 	response, err := http.Get(call)
 	if err != nil {
 		return "", err
