@@ -83,3 +83,19 @@ func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size, para
 	return imgBase64Str, nil
 	//return fmt.Sprintf("Ratio: %f, %s, %s, %+v, %v", ratio, url, layer, bounds.Bounds(), size)
 }
+
+// GetXYfromLonLat
+func GetXYfromLonLat(bounds *geom.MultiPoint, size Size, point [2]float64) (coordinates [2]int) {
+
+	left := bounds.Bounds().Min(0)
+	right := bounds.Bounds().Max(0)
+	bottom := bounds.Bounds().Max(1)
+	top := bounds.Bounds().Min(1)
+	widthdegree := right - left
+	heightdegree := bottom - top
+	widthpoint := point[0] - left
+	heightpoint := bottom - point[1]
+	coordinates[0] = int(float64(size.Width) / widthdegree * widthpoint)
+	coordinates[1] = int(float64(size.Height) / heightdegree * heightpoint)
+	return coordinates
+}
