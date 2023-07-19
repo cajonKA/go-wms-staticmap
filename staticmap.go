@@ -3,7 +3,6 @@ package wmsstaticmap
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,7 +13,7 @@ import (
 	"github.com/twpayne/go-geom"
 )
 
-//Size : can either be Integer for the long side, or a struct consistant of width and height (both integers)
+// Size : can either be Integer for the long side, or a struct consistant of width and height (both integers)
 type Size struct {
 	Width, Height int
 }
@@ -42,12 +41,18 @@ func (d *Size) UnmarshalJSON(data []byte) error {
 
 // FetchMap : fetch a map from url and layer with bounds in EPSG:4326 and return a png with size
 func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size, params map[string]string) (result string, err error) {
-	if bounds.SRID() != 4326 {
-		return "", errors.New("NO VALID SRID")
+	if bounds.SRID() != 4326 && bounds.SRID() != 3857 {
+		return "", fmt.Errorf("NO VALID SRID, it is %d", bounds.SRID())
 	}
 	center := (bounds.Bounds().Max(1) + bounds.Bounds().Min(1)) / 2
-	vh := (bounds.Bounds().Max(1) - bounds.Bounds().Min(1)) * 111                                      // Lattitude distance is 111km
-	vw := (bounds.Bounds().Max(0) - bounds.Bounds().Min(0)) * 111.325 * math.Cos(math.Pi*(center)/180) // Longitude distance is 111,325km * cos(latitude)
+	var vw, vh float64
+	if bounds.SRID() == 4326 {
+		vh = (bounds.Bounds().Max(1) - bounds.Bounds().Min(1)) * 111                                      // Lattitude distance is 111km
+		vw = (bounds.Bounds().Max(0) - bounds.Bounds().Min(0)) * 111.325 * math.Cos(math.Pi*(center)/180) // Longitude distance is 111,325km * cos(latitude)
+	} else {
+		vh = bounds.Bounds().Max(1) - bounds.Bounds().Min(1)
+		vw = bounds.Bounds().Max(0) - bounds.Bounds().Min(0)
+	}
 	ratio := vw / vh
 	if size.Height < 2 {
 		size.Height = int(float64(size.Width) / ratio)
@@ -63,7 +68,7 @@ func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size, para
 		}
 		paramString = "&" + strings.Join(allParams, "&")
 	}
-	call := fmt.Sprintf("%s?service=WMS&version=1.1.0&request=GetMap&layers=%s&bbox=%f,%f,%f,%f&width=%d&height=%d&srs=EPSG:4326&format=image/png%s", url, layer, bounds.Bounds().Min(0), bounds.Bounds().Min(1), bounds.Bounds().Max(0), bounds.Bounds().Max(1), size.Width, size.Height, paramString)
+	call := fmt.Sprintf("%s?service=WMS&version=1.1.0&request=GetMap&layers=%s&bbox=%f,%f,%f,%f&width=%d&height=%d&srs=EPSG:%d&format=image/png%s", url, layer, bounds.Bounds().Min(0), bounds.Bounds().Min(1), bounds.Bounds().Max(0), bounds.Bounds().Max(1), size.Width, size.Height, bounds.SRID(), paramString)
 	log.Printf("%+v", call)
 	response, err := http.Get(call)
 	if err != nil {
