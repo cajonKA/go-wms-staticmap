@@ -57,9 +57,7 @@ func FetchMap(url string, layer string, bounds *geom.MultiPoint, size Size, para
 	if size.Height < 2 {
 		size.Height = int(float64(size.Width) / ratio)
 	}
-	if size.Width < size.Height {
-		size.Width, size.Height = size.Height, size.Width
-	}
+
 	paramString := ""
 	if len(params) > 0 {
 		allParams := make([]string, 0, len(params))
